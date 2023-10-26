@@ -33,15 +33,6 @@ _IMAGE_FILE_EXTS = ["JPG", "JPEG", "PNG", "AAE", "WEBP", "GIF", "TIFF"]
 _VIDEO_FILE_EXTS = ["MOV", "MP4", "M4V"]
 _MISC_FILE_EXTS = ["PDF"]
 _APPLE_IMAGE_FILE_EXTS = ["HEIC"]
-
-# def main():
-#     """Main script function"""
-#     # get list of files
-#     # remove/ignore file types specified in _SKIP_FILE_TYPES
-#     # try and load image via Image class
-
-# if __name__ == "__main__":
-#     main()
 class ImageSorta():
     """ This is the docstring
     """
@@ -67,6 +58,11 @@ class ImageSorta():
         return self.filetype.upper()
 
     def _get_image_date(self):
+        """Tries to determine the image date from the EXIF information of a file
+        however if the file cannot be loaded as an image, then it defaults to
+        using the file date.
+        """
+
         log.debug(f"[{self.filename}] Trying to determine image date")
 
         try:
@@ -81,13 +77,8 @@ class ImageSorta():
         self._get_exif_date(image_obj)
 
     def _extract_heic_datetime(self):
-        """Extracts the datetime from a HEIC file.
-
-        Args:
-            heic_file_path: The path to the HEIC file.
-
-        Returns:
-            A datetime object representing the datetime the HEIC file was taken.
+        """Extracts the datetime_original field from a HEIC file and saves it to
+        self.datetime, otherwise will use the file date.
         """
 
         # Open image file for reading (must be in binary mode)
@@ -104,6 +95,9 @@ class ImageSorta():
                 self._get_file_date()
 
     def _get_file_date(self):
+        """Extracts the creation and modification times of the file and sets
+        self.datetime to the earlier of the 2 dates"""
+
         log.debug(f"[{self.filename}] Trying to determine file date")
         # Get file metadata
         file_stat = os.stat(self.path)
@@ -134,16 +128,16 @@ class ImageSorta():
             self.datetime = creation_time_tz_aware
 
     def _get_exif_date(self, image):
+        """Extracts the datetime_original field from the exif information
+        contained within an identified image file. If the field doesn't exist
+        within the exif information, then it defaults to the file date."""
+
         log.debug(f"[{self.filename}] Trying to get date from exif")
 
         if image.has_exif:
-            # status = f"contains EXIF (version {image_file.exif_version}) information."
-            # print(f"Image {file} {status}")
-            # print(dir(image_file))
-            # if "datetime_original" in image_file:
+
             if image.get("datetime_original"):
                 self.datetime = datetime.strptime(image['datetime_original'], '%Y:%m:%d %H:%M:%S')
-            # elif "datetime_digitized" in image_file:
             elif image.get("datetime_digitized"):
                 self.datetime = datetime.strptime(image['datetime_digitized'], '%Y:%m:%d %H:%M:%S')
             elif image.get("datetime"):
@@ -158,13 +152,14 @@ class ImageSorta():
             if self.args.loglevel.upper() == "DEBUG":
                 log.warn(f"[{self.filename}] does not contain any EXIF information.")
             self._get_file_date()
-            # return None
 
     def _move_file(self):
+        """Uses the determined datetime field of the file to generate the path the
+        file should be stored in, creates the path/folder if it doesn't exist and
+        then moves the file into the path."""
 
         year = datetime.strftime(self.datetime, '%Y' )
         newdirname = datetime.strftime(self.datetime, '%Y%m%d' )
-        # print(folder_name)
         dst_folder = os.path.join(self.DST_ROOT ,year, newdirname)
         dst_full_path = os.path.join(dst_folder ,self.filename)
         if not os.path.isdir(dst_folder):
@@ -172,8 +167,6 @@ class ImageSorta():
             os.makedirs(dst_folder)
         log.info(f"[{self.filename}] moving: {self.path} > {dst_full_path}")
         shutil.move(self.path, dst_full_path)
-        # exit()
-
 
     def process_file(self):
         """run the actual process
