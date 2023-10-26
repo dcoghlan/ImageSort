@@ -29,8 +29,9 @@ _timezone = "Australia/Sydney"
   
 _SKIP_FILE_TYPES = [".MOV", ".AAE", ".MP4"]
 
-_IMAGE_FILE_EXTS = ["JPG", "JPEG", "PNG", "AAE", "WEBP", "GIF"]
+_IMAGE_FILE_EXTS = ["JPG", "JPEG", "PNG", "AAE", "WEBP", "GIF", "TIFF"]
 _VIDEO_FILE_EXTS = ["MOV", "MP4", "M4V"]
+_MISC_FILE_EXTS = ["PDF"]
 _APPLE_IMAGE_FILE_EXTS = ["HEIC"]
 
 # def main():
@@ -45,14 +46,15 @@ class ImageSorta():
     """ This is the docstring
     """
 
-    def __init__(self, args, path, tz, IMAGE_FILE_EXTS, VIDEO_FILE_EXTS, APPLE_IMAGE_FILE_EXTS, DST_ROOT ):
+    def __init__(self, args, path, tz, IMAGE_FILE_EXTS, VIDEO_FILE_EXTS, MISC_FILE_EXTS, APPLE_IMAGE_FILE_EXTS, DST_ROOT ):
         self.args = args
         self.path = path
         self.filename = os.path.basename(self.path)
-        self.fileext = self.filename.split('.')[1]
+        self.fileext = os.path.splitext(self.filename)[1].lstrip('.')
         self.tz = tz
         self.IMAGE_FILE_EXTS = IMAGE_FILE_EXTS
         self.VIDEO_FILE_EXTS = VIDEO_FILE_EXTS
+        self.MISC_FILE_EXTS = MISC_FILE_EXTS
         self.APPLE_IMAGE_FILE_EXTS = APPLE_IMAGE_FILE_EXTS
         self.DST_ROOT = DST_ROOT
         self.filetype = None
@@ -87,12 +89,6 @@ class ImageSorta():
         Returns:
             A datetime object representing the datetime the HEIC file was taken.
         """
-
-        # with pyheif.ImageFile(self.path) as image:
-        #     datetime_tag = image.metadata['DateTimeOriginal']
-
-        # self.datetime = datetime.datetime.strptime(datetime_tag, '%Y:%m:%d %H:%M:%S')
-        # print(self.datetime)
 
         # Open image file for reading (must be in binary mode)
         with open(self.path, "rb") as file_handle:
@@ -165,18 +161,7 @@ class ImageSorta():
             # return None
 
     def _move_file(self):
-        # fn = os.path.basename(self.path)
-        # try:
-        #     datetime_object = datetime.strptime(image_file['datetime_original'], '%Y:%m:%d %H:%M:%S')
-        # except AttributeError as e:
-        #     print("ERROR: %s" %(e))
-        #     print(dir(image_file))
-        #     print("datetime: %s" %(image_file["datetime"]))
-        #     print("datetime_digitized: %s" %(image_file["datetime_digitized"]))
-        #     exit()
 
-        # print(image_file['datetime_original'])
-        # print(datetime_object)
         year = datetime.strftime(self.datetime, '%Y' )
         newdirname = datetime.strftime(self.datetime, '%Y%m%d' )
         # print(folder_name)
@@ -206,8 +191,12 @@ class ImageSorta():
             self.filetype = "video"
             log.debug(f"[{self.filename}] Filetype = {self.filetype}")
             self._get_file_date()
+        elif self.fileext.upper() in self.MISC_FILE_EXTS:
+            self.filetype = "misc"
+            log.debug(f"[{self.filename}] Filetype = {self.filetype}")
+            self._get_file_date()
         else:
-            log.error(f"[{self.filename}] Unknown file extension")
+            log.error(f"[{self.filename}] Unknown file extension: {self.fileext.upper()}")
 
         log.debug(f"[{self.filename}] datetime = {self.datetime}")
         
@@ -226,12 +215,6 @@ def parse_args():
         type=str,
         help="Path to file or folder",
     )
-    # parser.add_argument(
-    #     "--set-date",
-    #     metavar='YYYY-MM-DD',
-    #     default=datetime.now().date().strftime('%Y-%m-%d'),
-    #     help='Specify the date in the format YYYY-MM-DD (default: today)"',
-    # )
     parser.add_argument(
         "--loglevel",
         type=str,
@@ -245,65 +228,15 @@ def parse_args():
     
     return args
 
-args = parse_args()
-log.setLevel(args.loglevel.upper())
+def main():
+    args = parse_args()
+    log.setLevel(args.loglevel.upper())
 
+    for item in sorted(glob.glob(os.path.join(_SRC_DIR, '*'))):
+        if os.path.isfile(item):
+            log.debug("processing file: %s" %(item))
+            imagesorta = ImageSorta(args, item, _timezone, _IMAGE_FILE_EXTS, _VIDEO_FILE_EXTS, _MISC_FILE_EXTS, _APPLE_IMAGE_FILE_EXTS, _DST_ROOT)
+            imagesorta.process_file()
 
-
-
-
-
-
-
-
-for item in sorted(glob.glob(os.path.join(_SRC_DIR, '*'))):
-    if os.path.isfile(item):
-        log.debug("processing file: %s" %(item))
-        imagesorta = ImageSorta(args, item, _timezone, _IMAGE_FILE_EXTS, _VIDEO_FILE_EXTS, _APPLE_IMAGE_FILE_EXTS, _DST_ROOT)
-        imagesorta.process_file()
-
-    # print(imagesorta.get_filename())
-    # print(imagesorta.get_filetype())
-    # exit()
-    # split_text = os.path.splitext(file)
-    # filename = os.path.basename(file)
-    # if split_text[1].upper() == ".PNG":
-    #     get_file_dates(file, _timezone)
-    #     # exit()
-    # if split_text[1].upper() in _SKIP_FILE_TYPES:
-    #     log.debug(f"[{filename}] Skipping... due to ignore list")
-    #     continue
-    # print(split_text)
-    # try:
-    #     image_file = Image(file)
-    # except Exception as e:
-    #     log.error(f"[{filename}] Skipping... not an image file")
-    #     # log.error(f"{e}")
-    #     continue
-        
-    # datetime_object = get_exif_date(image_file, filename, _timezone)
-    # datetime_object = get_image_date(file, _timezone)
-    # move_file(datetime_object, file, _DST_ROOT)
-
-exit()
-import re
-
-log.info('----- Processing mp4 files -----')
-for vfile in sorted(glob.glob(os.path.join(_SRC_DIR, '*.mp4'))):
-    log.debug("processing mp4 file: %s" %(vfile))
-
-    # log.info(f"{vfile}")
-    # log.info(f"{os.path.basename(vfile)}")
-    pattern = re.compile("^\d{8}_\d{6}(_\d{2})*.mp4$")
-    if pattern.match(os.path.basename(vfile)):
-        split_string = os.path.basename(vfile).split('_')
-        folder_year = split_string[0][:4]
-        _DST_FOLDER = os.path.join(_DST_ROOT, folder_year, split_string[0])
-        _DST_FULL_PATH = os.path.join(_DST_FOLDER, os.path.basename(vfile))
-        if not os.path.isdir(_DST_FOLDER):
-            log.info("Creating folder: %s" %(_DST_FOLDER))
-            os.makedirs(_DST_FOLDER)
-        log.info("moving: %s > %s" %(vfile, _DST_FULL_PATH))
-        shutil.move(vfile, _DST_FULL_PATH)
-    else:
-        log.error("ERROR: Unknow file match: %s" %(os.path.basename(vfile)))
+if __name__ == "__main__":
+    main()
