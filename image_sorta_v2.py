@@ -19,8 +19,9 @@ import shutil
 import pytz
 import argparse
 import exifread
+import re
 
-_SRC_DIR = "/Users/dcoghlan/Pictures/iphone_xs_max/"
+_SRC_DIR = "/Users/dcoghlan/Downloads/dale_android_2024_09_30/"
 # _SRC_DIR = "/Users/dcoghlan/Pictures/iphone_xs_max/dev"
 # _SRC_DIR = "/Users/dcoghlan/Pictures/tosort/"
 _DST_ROOT = "/Users/dcoghlan/Desktop/tocopy/"
@@ -99,6 +100,12 @@ class ImageSorta():
         self.datetime to the earlier of the 2 dates"""
 
         log.debug(f"[{self.filename}] Trying to determine file date")
+
+        if (file_name_date := self._get_date_from_filename()):
+            log.debug(f"[{self.filename}] Extracted date from file name")
+            self.datetime = file_name_date
+            return
+
         # Get file metadata
         file_stat = os.stat(self.path)
 
@@ -126,6 +133,17 @@ class ImageSorta():
         else:
             log.debug(f"[{self.filename}] Creation and modification times are the same.")
             self.datetime = creation_time_tz_aware
+
+    def _get_date_from_filename(self):
+        ''' Try and extract a date from the filename
+        '''
+        pattern = r"^(\d{8}_\d{6}).mp4$"
+        match = re.match(pattern, self.filename)
+
+        if match:
+            return datetime.strptime(match.group(1), "%Y%m%d_%H%M%S")
+        
+        return None
 
     def _get_exif_date(self, image):
         """Extracts the datetime_original field from the exif information
@@ -205,6 +223,7 @@ def parse_args():
     )
     parser.add_argument(
         "--source",
+        required=True,
         type=str,
         help="Path to file or folder",
     )
@@ -218,17 +237,32 @@ def parse_args():
     )
 
     args = parser.parse_args()
-    
+
     return args
 
+def check_path(path):
+    ''' Check for the existence of a directoy and that it is actually a 
+        directory
+    '''
+    if os.path.exists(path) and os.path.isdir(path):
+        log.info("Path exists and is a directory: %s", path)
+    else:
+        log.error("Pathdoes not exist or is not a directory: %s", path)
+
 def main():
+    ''' Runs main program '''
     args = parse_args()
     log.setLevel(args.loglevel.upper())
 
-    for item in sorted(glob.glob(os.path.join(_SRC_DIR, '*'))):
+    check_path(args.source)
+    check_path(_DST_ROOT)
+
+    for item in sorted(glob.glob(os.path.join(args.source, '*'))):
         if os.path.isfile(item):
             log.debug("processing file: %s" %(item))
-            imagesorta = ImageSorta(args, item, _timezone, _IMAGE_FILE_EXTS, _VIDEO_FILE_EXTS, _MISC_FILE_EXTS, _APPLE_IMAGE_FILE_EXTS, _DST_ROOT)
+            imagesorta = ImageSorta(args, item, _timezone, _IMAGE_FILE_EXTS,
+                                    _VIDEO_FILE_EXTS, _MISC_FILE_EXTS, 
+                                    _APPLE_IMAGE_FILE_EXTS, _DST_ROOT)
             imagesorta.process_file()
 
 if __name__ == "__main__":
